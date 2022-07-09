@@ -12,3 +12,4 @@ pytesseract
 torchvision
 torch
 cairocffi
+dict2xml
