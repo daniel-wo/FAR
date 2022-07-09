@@ -5,10 +5,7 @@ scikit-image
 scikit-learn
 imageio
 matplotlib
-paddlepaddle
-paddleocr
 opencv-python
-pytesseract
 torchvision
 torch
 cairocffi
