@@ -1,0 +1,16 @@
+/full_binary_circle.bin filter=lfs diff=lfs merge=lfs -text
+/test_images/automaton6.png filter=lfs diff=lfs merge=lfs -text
+/test_images/automaton10.png filter=lfs diff=lfs merge=lfs -text
+/test_images/automaton9.png filter=lfs diff=lfs merge=lfs -text
+/frontend/package-lock.json filter=lfs diff=lfs merge=lfs -text
+/recognition/build/lib.linux-x86_64-3.8/keras_retinanet/utils/compute_overlap.cpython-38-x86_64-linux-gnu.so filter=lfs diff=lfs merge=lfs -text
+/recognition/build/temp.linux-x86_64-3.8/keras_retinanet/utils/compute_overlap.o filter=lfs diff=lfs merge=lfs -text
+/recognition/keras_retinanet/utils/compute_overlap.c filter=lfs diff=lfs merge=lfs -text
+/recognition/keras_retinanet/utils/compute_overlap.cpython-38-x86_64-linux-gnu.so filter=lfs diff=lfs merge=lfs -text
+/recognition/models/resnet50_detection_and_classification.h5 filter=lfs diff=lfs merge=lfs -text
+/recognition/output/automaton10.png filter=lfs diff=lfs merge=lfs -text
+/recognition/output/automaton6.png filter=lfs diff=lfs merge=lfs -text
+/recognition/output/automaton7.png filter=lfs diff=lfs merge=lfs -text
+/recognition/output/automaton9.png filter=lfs diff=lfs merge=lfs -text
+/recognition/models/bigModel.h5 filter=lfs diff=lfs merge=lfs -text
+*.h5 filter=lfs diff=lfs merge=lfs -text
