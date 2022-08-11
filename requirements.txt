@@ -10,3 +10,12 @@ torchvision
 torch
 cairocffi
 dict2xml
+cython
+keras-resnet==0.2.0
+h5py
+keras
+matplotlib
+numpy>=1.14
+pillow
+progressbar2
+tensorflow-cpu >=2.3.0
