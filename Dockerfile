@@ -3,7 +3,7 @@ FROM python:3.8
 WORKDIR /usr/src/app
 
 RUN apt-get update
-RUN apt-get -qq -y install curl ffmpeg libsm6 libxext6 git
+RUN apt-get -qq -y install curl ffmpeg libsm6 libxext6 git git-lfs
 #RUN set -xe \
 #    && apt-get -y install python3-pip
 RUN pip3 install --upgrade pip
