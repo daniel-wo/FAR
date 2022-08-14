@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET
 from dict2xml import dict2xml
 import cv2
+from os.path import exists
  
 
 def get_traces_data(inkml_file_abs_path):
@@ -124,6 +125,23 @@ def extractAnnotations(inkml_file_abs_path, size, filename):
                     "bndbox": bndbox
                 }
             )
+    if(exists(f'../additional_annotations/{filename}.xml')):
+        add_tree = ET.parse(f'../additional_annotations/{filename}.xml')
+        add_root = add_tree.getroot()
+        for arrow in add_root.findall('object'):
+            xml_bndbox = arrow.find('bndbox')
+            annotations["object"].append(
+                {
+                    "name": arrow.find('name').text,
+                    "bndbox": {
+                        "xmin": int(xml_bndbox.find('xmin').text) -50,
+                        "ymin": int(xml_bndbox.find('ymin').text) -50,
+                        "xmax": int(xml_bndbox.find('xmax').text) -50,
+                        "ymax": int(xml_bndbox.find('ymax').text) -50
+                    }
+                }
+            )
+                
     xml = dict2xml(annotations)
     xmlfile = open(f"../datasets/automata/annotations/{filename}.xml", "w+")
     xmlfile.write(xml)
@@ -164,8 +182,8 @@ def inkml2img(input_path, filename):
     annotations = extractAnnotations(input_path, (width,height), filename)
 
     #for object in annotations["object"]:
-    #   cv2.rectangle(image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
-    image = np.pad(image, ((50,50),(50,50),(0,0)), constant_values=(255))
+     # cv2.rectangle(image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
+    
     cv2.imwrite(f"../datasets/automata/images/{filename}.png",image)
 
     
