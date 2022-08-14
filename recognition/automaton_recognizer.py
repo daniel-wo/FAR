@@ -28,25 +28,22 @@ def get_session():
     config.gpu_options.allow_growth = True
     return tf.compat.v1.Session(config=config)
 
-def preprocess_image(image):
-  th, image = cv2.threshold(image, 128, 255, cv2.THRESH_BINARY)
- 
-  return invert(image)
+def detection_on_image(image):
 
-def detection_on_image(model, image):
+  model_path = 'models/bigModel.h5'
+  model = models.load_model(model_path, backbone_name='resnet50')
 
   draw = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
   image = preprocess_image(image)
   image, scale = resize_image(image)
-
-
-  labels_to_names = {0: "arrow", 1: "label", 2: "state", 3: "final state"}
+  
+  labels_to_names = {3: "arrow", 0: "label", 1: "state", 2: "final state"}
   cv2.imwrite("output/input_for_classifier.png", image)
   boxes, scores, labels = model.predict_on_batch(np.expand_dims(image, axis=0))
   boxes /= scale
   for box, score, label in zip(boxes[0], scores[0], labels[0]):
 
-      if score < 0.4:
+      if score < 0.3:
           break
 
       color = label_color(label)
@@ -63,7 +60,7 @@ def detection_on_image(model, image):
   detected_labels = []
 
   for i in range(len(boxes[0])):
-    if(scores[0][i] >= 0.4):
+    if(scores[0][i] >= 0.3):
       if labels_to_names[labels[0][i]] == "state" and scores[0][i] >= 0.8:
         detected_states.append({
           "id": len(detected_states),
@@ -152,75 +149,73 @@ def findArrowConnection(image, arrow, detected_states):
     direction = Direction.NORTH_WEST
   else:
     print("this should not happen")
-  
-
   arrow_box_radius = 0
 
 
   for i in range(int(arrow["bndbox"][0]-arrow_box_radius), int(arrow["bndbox"][2]+arrow_box_radius)):
     for j in range(int(arrow["bndbox"][1]-arrow_box_radius),int(arrow["bndbox"][3]+arrow_box_radius)):
       if image[j,i] != 0:
-        line_chaser_results.append(chase_line(image, (i,j), direction))
-        line_chaser_results.append(chase_line(image, (i,j), direction-1%8))
-        line_chaser_results.append(chase_line(image, (i,j), direction+1%8))
+        line_chaser_results.append(chase_line(image.copy(), (i,j), direction))
+     
 
 
 
-  print(direction)
-  endPoint = (max(line_chaser_results,key=lambda item:item[1]))
-  print(endPoint)
-  radius = 20
-    
-  for state in detected_states:
-    search_box = {
-      "minX": state["bndbox"][0] - radius,
-      "minY": state["bndbox"][1] - radius,
-      "maxX": state["bndbox"][2] + radius,
-      "maxY": state["bndbox"][3] + radius
-    }
+  if(line_chaser_results != []):
+    endPoint = (max(line_chaser_results,key=lambda item:item[1]))
+    print(endPoint)
+    radius = 20
+    for state in detected_states:
+      search_box = {
+        "minX": state["bndbox"][0] - radius,
+        "minY": state["bndbox"][1] - radius,
+        "maxX": state["bndbox"][2] + radius,
+        "maxY": state["bndbox"][3] + radius
+      }
 
-    if(search_box["minX"] < endPoint[0][0] < search_box["maxX"] and search_box["minY"] < endPoint[0][1] < search_box["maxY"]):
-      return state["id"]
-  return "start"
+      if(search_box["minX"] < endPoint[0][0] < search_box["maxX"] and search_box["minY"] < endPoint[0][1] < search_box["maxY"]):
+        
+        return state["id"]
+    return "start"
 
 def main():
   keras.backend.set_session(get_session())
 
   input_file_path = sys.argv[1]
 
-  print(input_file_path)
   image = cv2.imread(input_file_path)
+  
+  image = np.pad(image, ((50,50),(50,50),(0,0)),constant_values=(255))
 
-  model_path = 'models/bigModel.h5'
-  model = models.load_model(model_path, backbone_name='resnet50')
+  detected_states, detected_arrows, detected_labels = detection_on_image(image)
 
-  detected_states, detected_arrows, detected_labels = detection_on_image(model, image)
-
-  radius = 50
+  state_association_radius = 20
 
 
   skeleton_image = skeletonize(invert(image))
   skeleton_image=cv2.cvtColor(skeleton_image,cv2.COLOR_BGR2GRAY)
   skeleton_image[skeleton_image>128] = 255
-  delete_radius = 10
+  delete_radius = 5
   for state in detected_states:
-    skeleton_image[int(state["bndbox"][1] - delete_radius):int(state["bndbox"][3] + delete_radius),int(state["bndbox"][0] - delete_radius):int(state["bndbox"][2]) + delete_radius] = 0
+    state_center = (int((state["bndbox"][0] + state["bndbox"][2])/2), int((state["bndbox"][1] + state["bndbox"][3])/2))
+    print(state_center)
+    axes_lengths = (int((state["bndbox"][2] - state["bndbox"][0])/2) + delete_radius,int((state["bndbox"][3] - state["bndbox"][1])/2) + delete_radius)
+    print(axes_lengths)
+    cv2.ellipse(skeleton_image, state_center, axes_lengths, 0, 0, 360, (0,0,0), -1)
     cv2.putText(skeleton_image, str(state["id"]), (int(state["bndbox"][0] + 100),int(state["bndbox"][1] + 100)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
 
   
   cv2.imwrite("output/input_line_chaser.png", skeleton_image)
   
-
   for state in detected_states:
     search_box = {
-      "minX": state["bndbox"][0] - radius,
-      "minY": state["bndbox"][1] - radius,
-      "maxX": state["bndbox"][2] + radius,
-      "maxY": state["bndbox"][3] + radius
+      "minX": state["bndbox"][0] - state_association_radius,
+      "minY": state["bndbox"][1] - state_association_radius,
+      "maxX": state["bndbox"][2] + state_association_radius,
+      "maxY": state["bndbox"][3] + state_association_radius
     }
 
     for arrow in detected_arrows:
-
+      
       if do_overlap((search_box["minX"], search_box["minY"]),(search_box["maxX"], search_box["maxY"]),
         (arrow["bndbox"][0], arrow["bndbox"][1]), (arrow["bndbox"][2],arrow["bndbox"][3])):
         arrow["pointingAt"] = state["id"]
