@@ -28,6 +28,8 @@ def get_session():
     config.gpu_options.allow_growth = True
     return tf.compat.v1.Session(config=config)
 
+
+
 def detection_on_image(image):
 
   model_path = 'models/bigModel.h5'
