@@ -32,7 +32,7 @@ def get_session():
 
 def detection_on_image(image):
 
-  model_path = 'models/bigModel.h5'
+  model_path = 'models/testThis.h5'
   model = models.load_model(model_path, backbone_name='resnet50')
 
   draw = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -48,6 +48,9 @@ def detection_on_image(image):
       if score < 0.3:
           break
 
+      if(label == 0 and score < 0.8):
+        continue
+        
       color = label_color(label)
       b = box.astype(int)
       draw_box(draw, b, color=color)
@@ -57,20 +60,30 @@ def detection_on_image(image):
   detected_img =cv2.cvtColor(draw, cv2.COLOR_RGB2BGR)
   cv2.imwrite(f'output/classification.png', detected_img)
 
+  state_confidence_treshold = 0.5
+
   detected_states = []
   detected_arrows = []
   detected_labels = []
-
   for i in range(len(boxes[0])):
     if(scores[0][i] >= 0.3):
-      if labels_to_names[labels[0][i]] == "state" and scores[0][i] >= 0.8:
-        detected_states.append({
-          "id": len(detected_states),
-          "bndbox": boxes[0][i],
-          "final": False,
-          "score": scores[0][i]
-        })
-      elif labels_to_names[labels[0][i]] == "final state" and scores[0][i] >= 0.8:
+      if labels_to_names[labels[0][i]] == "state" and scores[0][i] >= state_confidence_treshold:
+        
+        for j in range(len(boxes[0])):
+            if(labels[0][j] == 2 
+              and do_overlap((boxes[0][i][0],boxes[0][i][1]),(boxes[0][i][2],boxes[0][i][3]), (boxes[0][j][0],boxes[0][j][1]),(boxes[0][j][2],boxes[0][j][3]))
+              and scores[0][j] >= state_confidence_treshold):
+              print("overlaps final state")
+              break
+        else:
+          print("appended")
+          detected_states.append({
+            "id": len(detected_states),
+            "bndbox": boxes[0][i],
+            "final": False,
+            "score": scores[0][i]
+          })
+      elif labels_to_names[labels[0][i]] == "final state" and scores[0][i] >= state_confidence_treshold:
         detected_states.append({
           "id": len(detected_states),
           "bndbox": boxes[0][i],
@@ -85,7 +98,7 @@ def detection_on_image(image):
           "pointingFrom": None,
           "pointingAt": None
         })
-      elif labels_to_names[labels[0][i]] == "label":
+      elif labels_to_names[labels[0][i]] == "label" and scores[0][i] >= 0.8:
         detected_labels.append({
           "id": len(detected_labels),
           "bndbox": boxes[0][i],
