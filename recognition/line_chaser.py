@@ -20,9 +20,11 @@ class Direction(IntEnum):
 # image.save("test.png")
 # image_matrix = np.array(image)
 
+def getBoxCenter(bndbox):
+  return (int((bndbox[0] + bndbox[2]) / 2), int((bndbox[1] + bndbox[3]) /2))
 
 
-def chase_line(image, starting_position, initial_direction, output_image):
+def chase_line(image, starting_position, initial_direction, output_image, detected_labels, arrow_id):
 
   image_matrix = np.array(image)
   height, width = image_matrix.shape
@@ -42,6 +44,15 @@ def chase_line(image, starting_position, initial_direction, output_image):
   while(window_value_sum > 0):
 
     (x,y) = current_position
+
+    for label in detected_labels:
+      if label["isStateLabel"]:
+        continue
+      label_center = getBoxCenter(label["bndbox"])
+      distance_to_label = np.linalg.norm((x-label_center[0],y-label_center[1]))
+      if label["closestTransitionDistance"] > distance_to_label:
+        label["closestTransitionDistance"] = distance_to_label
+        label["closestTransition"] = arrow_id
 
     #print(f"current position:{(x,y)}, current direction:{current_direction}")
 
