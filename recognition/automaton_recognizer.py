@@ -17,6 +17,7 @@ from skimage.morphology import skeletonize
 from skimage import data
 from skimage.util import invert
 from line_chaser import chase_line, Direction
+from PIL import Image, ImageDraw
 
 import tensorflow as tf
 
@@ -30,9 +31,9 @@ def get_session():
 
 
 
-def detection_on_image(image):
+def detection_on_image(image, i):
 
-  model_path = 'models/testThis.h5'
+  model_path = 'models/testThis3.h5'
   model = models.load_model(model_path, backbone_name='resnet50')
 
   draw = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -40,15 +41,17 @@ def detection_on_image(image):
   image, scale = resize_image(image)
   
   labels_to_names = {3: "arrow", 0: "label", 1: "state", 2: "final state"}
-  cv2.imwrite("output/input_for_classifier.png", image)
+  cv2.imwrite(f"output/{i}/input_for_classifier.png", image)
   boxes, scores, labels = model.predict_on_batch(np.expand_dims(image, axis=0))
   boxes /= scale
+  state_confidence_treshold = 0.8
+
   for box, score, label in zip(boxes[0], scores[0], labels[0]):
 
-      if score < 0.3:
+      if score < 0.4:
           break
 
-      if(label == 0 and score < 0.8):
+      if((label == 1 or label == 2) and score < state_confidence_treshold):
         continue
         
       color = label_color(label)
@@ -58,25 +61,22 @@ def detection_on_image(image):
       draw_caption(draw, b, caption)
 
   detected_img =cv2.cvtColor(draw, cv2.COLOR_RGB2BGR)
-  cv2.imwrite(f'output/classification.png', detected_img)
+  cv2.imwrite(f'output/{i}/classification.png', detected_img)
 
-  state_confidence_treshold = 0.5
 
   detected_states = []
   detected_arrows = []
   detected_labels = []
   for i in range(len(boxes[0])):
-    if(scores[0][i] >= 0.3):
+    if(scores[0][i] >= 0.4):
       if labels_to_names[labels[0][i]] == "state" and scores[0][i] >= state_confidence_treshold:
         
         for j in range(len(boxes[0])):
             if(labels[0][j] == 2 
               and do_overlap((boxes[0][i][0],boxes[0][i][1]),(boxes[0][i][2],boxes[0][i][3]), (boxes[0][j][0],boxes[0][j][1]),(boxes[0][j][2],boxes[0][j][3]))
               and scores[0][j] >= state_confidence_treshold):
-              print("overlaps final state")
               break
         else:
-          print("appended")
           detected_states.append({
             "id": len(detected_states),
             "bndbox": boxes[0][i],
@@ -98,7 +98,7 @@ def detection_on_image(image):
           "pointingFrom": None,
           "pointingAt": None
         })
-      elif labels_to_names[labels[0][i]] == "label" and scores[0][i] >= 0.8:
+      elif labels_to_names[labels[0][i]] == "label":
         detected_labels.append({
           "id": len(detected_labels),
           "bndbox": boxes[0][i],
@@ -135,7 +135,7 @@ def getAngleBetweenPoints(point1, point2):
 def getBoxCenter(bndbox):
   return ((bndbox[0] + bndbox[2]) / 2, (bndbox[1] + bndbox[3]) /2)
 
-def findArrowConnection(image, arrow, detected_states):
+def findArrowConnection(image, arrow, detected_states, output_image):
 
   angle = getAngleBetweenPoints(getBoxCenter(arrow["bndbox"]), getBoxCenter(detected_states[arrow["pointingAt"]]["bndbox"]))
   line_chaser_results = []
@@ -164,21 +164,20 @@ def findArrowConnection(image, arrow, detected_states):
     direction = Direction.NORTH_WEST
   else:
     print("this should not happen")
-  arrow_box_radius = 0
+  arrow_box_radius = 10
 
 
   for i in range(int(arrow["bndbox"][0]-arrow_box_radius), int(arrow["bndbox"][2]+arrow_box_radius)):
     for j in range(int(arrow["bndbox"][1]-arrow_box_radius),int(arrow["bndbox"][3]+arrow_box_radius)):
       if image[j,i] != 0:
-        line_chaser_results.append(chase_line(image.copy(), (i,j), direction))
+        line_chaser_results.append(chase_line(image.copy(), (i,j), direction, output_image))
      
 
 
 
   if(line_chaser_results != []):
     endPoint = (max(line_chaser_results,key=lambda item:item[1]))
-    print(endPoint)
-    radius = 20
+    radius = 50
     for state in detected_states:
       search_box = {
         "minX": state["bndbox"][0] - radius,
@@ -192,18 +191,20 @@ def findArrowConnection(image, arrow, detected_states):
         return state["id"]
     return "start"
 
-def main():
+def main(input_file_path, i = 0):
+
+  if not os.path.exists(f"output/{i}"):
+    os.mkdir(f"output/{i}")
   keras.backend.set_session(get_session())
 
-  input_file_path = sys.argv[1]
 
   image = cv2.imread(input_file_path)
   
   image = np.pad(image, ((50,50),(50,50),(0,0)),constant_values=(255))
 
-  detected_states, detected_arrows, detected_labels = detection_on_image(image)
+  detected_states, detected_arrows, detected_labels = detection_on_image(image,i)
 
-  state_association_radius = 20
+  state_association_radius = 75
 
 
   skeleton_image = skeletonize(invert(image))
@@ -212,15 +213,19 @@ def main():
   delete_radius = 5
   for state in detected_states:
     state_center = (int((state["bndbox"][0] + state["bndbox"][2])/2), int((state["bndbox"][1] + state["bndbox"][3])/2))
-    print(state_center)
     axes_lengths = (int((state["bndbox"][2] - state["bndbox"][0])/2) + delete_radius,int((state["bndbox"][3] - state["bndbox"][1])/2) + delete_radius)
-    print(axes_lengths)
     cv2.ellipse(skeleton_image, state_center, axes_lengths, 0, 0, 360, (0,0,0), -1)
     cv2.putText(skeleton_image, str(state["id"]), (int(state["bndbox"][0] + 100),int(state["bndbox"][1] + 100)), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
 
   
-  cv2.imwrite("output/input_line_chaser.png", skeleton_image)
+  cv2.imwrite(f"output/{i}/input_line_chaser.png", skeleton_image)
   
+  line_chaser_output_image = Image.new(mode = "RGB", size=(image.shape[1],image.shape[0]), color="#ffffff")
+
+  if os.path.exists(f'output/{i}/transitions.txt'):
+    with open(f'output/{i}/transitions.txt', 'w') as f:
+      f.write("")
+
   for state in detected_states:
     search_box = {
       "minX": state["bndbox"][0] - state_association_radius,
@@ -229,16 +234,27 @@ def main():
       "maxY": state["bndbox"][3] + state_association_radius
     }
 
+
     for arrow in detected_arrows:
       
       if do_overlap((search_box["minX"], search_box["minY"]),(search_box["maxX"], search_box["maxY"]),
         (arrow["bndbox"][0], arrow["bndbox"][1]), (arrow["bndbox"][2],arrow["bndbox"][3])):
         arrow["pointingAt"] = state["id"]
-        arrow["pointingFrom"] = findArrowConnection(skeleton_image,arrow,detected_states)
+        arrow["pointingFrom"] = findArrowConnection(skeleton_image,arrow,detected_states, line_chaser_output_image)
         print(arrow)
 
-    
+     
+        
+        with open(f'output/{i}/transitions.txt', 'a') as f:
+          f.write(str(arrow))
+          f.write('\n')
 
-      
+  line_chaser_output_image.save(f"output/{i}/line_chaser_output.png")
+
+    
 if __name__ == "__main__":
-    main()
+  input_file_path = sys.argv[1]
+  main(input_file_path)
+      
+#for i in range(0,50):
+#  main(f"../datasets/automata/images/{i}.png", i)

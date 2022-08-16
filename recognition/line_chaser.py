@@ -22,7 +22,7 @@ class Direction(IntEnum):
 
 
 
-def chase_line(image, starting_position, initial_direction):
+def chase_line(image, starting_position, initial_direction, output_image):
 
   image_matrix = np.array(image)
   height, width = image_matrix.shape
@@ -31,7 +31,6 @@ def chase_line(image, starting_position, initial_direction):
 
   image_matrix = np.swapaxes(image,0,1)
 
-  output_image = Image.new(mode = "RGB", size=(width,height), color="#ffffff")
   draw = ImageDraw.Draw(output_image)
 
   
@@ -120,7 +119,6 @@ def chase_line(image, starting_position, initial_direction):
 
     draw.point(current_position, "#ff0000")
     steps +=1
-  output_image.save("output.png")
   return current_position, steps
 
 
