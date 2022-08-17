@@ -11,6 +11,8 @@ torch
 cairocffi
 dict2xml
 cython
+mmcv==1.6.0
+mmocr
 keras-resnet==0.2.0
 h5py
 keras
