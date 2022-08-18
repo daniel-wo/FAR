@@ -22,6 +22,7 @@ import tensorflow as tf
 
 from tensorflow.python.keras.backend import get_session
 
+
 # Parameters for classification and recognition purposes
 state_confidence_treshold = 0.8
 label_confidence_treshold = 0.7
@@ -224,6 +225,13 @@ def findArrowConnection(image, arrow, detected_states, output_image, detected_la
         return state["id"]
     return "start"
 
+def getLabelMeanings(detected_labels, image,i):
+
+  for label in detected_labels:
+    padded_image = np.pad(image[int(label["bndbox"][1] - 10) : int(label["bndbox"][3] + 10),int(label["bndbox"][0] - 10) : int(label["bndbox"][2] + 10),:], ((10,10),(10,10),(0,0)),constant_values=(255))
+    cv2.imwrite(f"output/{i}/{label['id']}.png", padded_image)
+
+
 
 def main(input_file_path, i = 0):
 
@@ -240,6 +248,7 @@ def main(input_file_path, i = 0):
 
   detected_labels = assignLabelsToStates(detected_labels, detected_states)
   
+  getLabelMeanings(detected_labels, image, i)
 
   skeleton_image = skeletonize(invert(image))
   skeleton_image=cv2.cvtColor(skeleton_image,cv2.COLOR_BGR2GRAY)
@@ -293,7 +302,8 @@ def main(input_file_path, i = 0):
   print("States:")
   for state in detected_states:
     print(state)
-
+  for label in detected_labels:
+    print(label)
   line_chaser_output_image.save(f"output/{i}/line_chaser_output.png")
 
     
