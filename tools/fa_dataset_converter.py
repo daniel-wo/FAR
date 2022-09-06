@@ -7,8 +7,9 @@ import xml.etree.ElementTree as ET
 from dict2xml import dict2xml
 import cv2
 from os.path import exists
- 
+import albumentations as A
 
+#Returns traces as lists of coordinates for drawing purposes and calculates an image size for the drawing
 def get_traces_data(inkml_file_abs_path):
 
     traces_data = []
@@ -60,7 +61,7 @@ def get_traces_data(inkml_file_abs_path):
     return traces_data, image_width, image_height
 
 
-
+#Gets the bounding box of a set of traces
 def getBoundingBoxOfTraces(object, root):
     traceIds = object.findall('traceView')
     traces = []
@@ -86,7 +87,7 @@ def getBoundingBoxOfTraces(object, root):
     }
 
 
-
+#Extracts annotations from inkml files
 def extractAnnotations(inkml_file_abs_path, size, filename):
     
     tree = ET.parse(inkml_file_abs_path)
@@ -94,7 +95,7 @@ def extractAnnotations(inkml_file_abs_path, size, filename):
 
     annotations =   {
         "folder": "datasets/automata",
-        "filename": filename,
+        "filename": filename*2,
         "path": f"\home\\niemand\Keras-retinanet-Training-on-custom-datasets-for-Object-Detection-/dataset/images/{filename}.jpg",
         "size": {"width": size[0], "height": size[1], "depth": 1},
         "segmented": 0,
@@ -134,22 +135,17 @@ def extractAnnotations(inkml_file_abs_path, size, filename):
                 {
                     "name": arrow.find('name').text,
                     "bndbox": {
-                        "xmin": int(xml_bndbox.find('xmin').text) -50,
-                        "ymin": int(xml_bndbox.find('ymin').text) -50,
-                        "xmax": int(xml_bndbox.find('xmax').text) -50,
-                        "ymax": int(xml_bndbox.find('ymax').text) -50
+                        "xmin": int(xml_bndbox.find('xmin').text) -60,
+                        "ymin": int(xml_bndbox.find('ymin').text) -60,
+                        "xmax": int(xml_bndbox.find('xmax').text) -60,
+                        "ymax": int(xml_bndbox.find('ymax').text) -60
                     }
                 }
             )
-                
-    xml = dict2xml(annotations)
-    xmlfile = open(f"../datasets/automata/annotations/{filename}.xml", "w+")
-    xmlfile.write(xml)
-    xmlfile.close()
 
     return annotations
 
-    
+#Finds max coordinates from a set of traces
 def findImageSize(all_traces):
     maxY = 0
     maxX = 0
@@ -162,6 +158,7 @@ def findImageSize(all_traces):
     return int(maxX), int(maxY)
 
 
+#Converts inkml files to a png file with a corresponding annotation xml file in pascal voc format
 def inkml2img(input_path, filename):
     
     traces, width, height = get_traces_data(input_path)
@@ -181,14 +178,82 @@ def inkml2img(input_path, filename):
 
     annotations = extractAnnotations(input_path, (width,height), filename)
 
-    #for object in annotations["object"]:
-     # cv2.rectangle(image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
+    file = filename * 2
+
+    for object in annotations["object"]:
+      cv2.rectangle(image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
+
+    xml = dict2xml(annotations)
+    xmlfile = open(f"../datasets/automata/annotations/{file}.xml", "w+")
+    xmlfile.write(xml)
+    xmlfile.close()
     
-    cv2.imwrite(f"../datasets/automata/images/{filename}.png",image)
+    cv2.imwrite(f"../datasets/automata/images/{file}.png",image)
+
+    # Augment image and save result as well
+    augmented_image, augmented_annotations = createAugmentations(image, annotations, file)
+    
+    xml = dict2xml(augmented_annotations)
+    xmlfile = open(f"../datasets/automata/annotations/{(file + 1)}.xml", "w+")
+    xmlfile.write(xml)
+    xmlfile.close()
+
+    for object in augmented_annotations["object"]:
+      cv2.rectangle(augmented_image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
 
     
+
+
+    cv2.imwrite(f"../datasets/automata/images/{(file + 1)}.png",augmented_image)
+
+    
+#Creates augmentations of image
+def createAugmentations(image, annotations, filename):
+
+    transform1 = A.Compose([
+        A.Flip(always_apply=True),
+        A.RandomScale(always_apply=True, scale_limit=(-0.5,-0.1))
+    ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))
+
+    transform2 = A.Compose([
+        A.Rotate(always_apply=True),
+        A.RandomScale(always_apply=True, scale_limit=(-0.5,-0.1))
+    ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))
+
+    bndbox_labels = []
+    bndboxes = []
+
+    for annotation in annotations["object"]:
+        bndbox_labels.append(annotation["name"])
+        bndboxes.append(
+            [
+                annotation["bndbox"]["xmin"],
+                annotation["bndbox"]["ymin"],
+                annotation["bndbox"]["xmax"],
+                annotation["bndbox"]["ymax"]
+            ]
+        )
+    transformed = transform1(image = image, bboxes = bndboxes, class_labels = bndbox_labels)
+    transformed_image = transformed['image']
+    transformed_bboxes = transformed['bboxes']
+
+    transformed_annotations = annotations.copy()
+
+    transformed_annotations["filename"] = filename+1
+    i = 0
+    for bndbox in transformed_bboxes:
+        transformed_annotations["object"][i]["bndbox"] = {
+            "xmin": int(bndbox[0]),
+            "ymin": int(bndbox[1]),
+            "xmax": int(bndbox[2]),
+            "ymax": int(bndbox[3])
+        }
+        i += 1
+    
+    return transformed_image, transformed_annotations
 
 
 for i in range(0,300):
-    inkml2img(f"../FA_database_1.1/{i}.inkml", f"{i}")
+    inkml2img(f"../FA_database_1.1/{i}.inkml", i)
+
 
