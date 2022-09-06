@@ -9,7 +9,7 @@ RUN apt-get -qq -y install curl ffmpeg libsm6 libxext6 git git-lfs
 RUN pip3 install --upgrade pip
 COPY requirements.txt ./
 RUN pip3 install --no-cache-dir -r requirements.txt
-
+RUN pip3 install -U albumentations --no-binary qudida,albumentations
 RUN useradd -m user
 RUN mkdir -p /home/user/.ssh
 RUN chown -R user:user /home/user/.ssh
