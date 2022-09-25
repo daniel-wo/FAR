@@ -13,7 +13,7 @@ import numpy as np
 import time
 import csv
 from skimage.morphology import skeletonize
-from skimage import data
+from skimage import data, filters
 from skimage.util import invert
 from line_chaser import chase_line, Direction
 from PIL import Image, ImageDraw
@@ -25,7 +25,7 @@ from tensorflow.python.keras.backend import get_session
 
 # Parameters for classification and recognition purposes
 state_confidence_treshold = 0.8
-label_confidence_treshold = 0.7
+label_confidence_treshold = 0.4
 arrow_confidence_treshold = 0.4
 state_association_radius = 75
 delete_radius = 5
@@ -33,7 +33,18 @@ arrow_end_to_state_radius = 50
 arrow_line_chaser_box_radius = 10
 arrow_min_length = 50
 
+def preprocessImageForRecognition(image):
 
+  gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+  #gauss = cv2.GaussianBlur(gray,(3,3),cv2.BORDER_DEFAULT)
+
+  binary = cv2.adaptiveThreshold(gray, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
+            cv2.THRESH_BINARY,15,11)
+
+  cv2.imwrite(f"output/preprocessed.png", binary)
+
+  return binary
 
 def get_session():
     config = tf.compat.v1.ConfigProto()
@@ -42,17 +53,29 @@ def get_session():
 
 
 # Evaluates the recognition model for states, final states, labels and arrowheads on the input image and returns dictionaries containing found entities
-def detection_on_image(image, i):
+def detection_on_image(image):
 
-  model_path = 'models/testThis3.h5'
+  preprocessImageForRecognition(image)
+
+  model_path = 'models/augment13epoch.h5'
   model = models.load_model(model_path, backbone_name='resnet50')
 
+
   draw = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+  
+  print(image.shape)
+  image = preprocessImageForRecognition(image)
+  cv2.imwrite(f"output/test1.png", image)
+
+  image = np.stack((image,image,image), axis=2)
+  cv2.imwrite(f"output/test2.png", image)
+
+  print(image.shape)
   image = preprocess_image(image)
   image, scale = resize_image(image)
   
   labels_to_names = {3: "arrow", 0: "label", 1: "state", 2: "final state"}
-  cv2.imwrite(f"output/{i}/input_for_classifier.png", image)
+  cv2.imwrite(f"output/input_for_classifier.png", image)
   boxes, scores, labels = model.predict_on_batch(np.expand_dims(image, axis=0))
   boxes /= scale
 
@@ -77,7 +100,7 @@ def detection_on_image(image, i):
       draw_caption(draw, b, caption)
 
   detected_img =cv2.cvtColor(draw, cv2.COLOR_RGB2BGR)
-  cv2.imwrite(f'output/{i}/classification.png', detected_img)
+  cv2.imwrite(f'output/classification.png', detected_img)
 
 
   detected_states = []
@@ -229,14 +252,14 @@ def getLabelMeanings(detected_labels, image,i):
 
   for label in detected_labels:
     padded_image = np.pad(image[int(label["bndbox"][1] - 10) : int(label["bndbox"][3] + 10),int(label["bndbox"][0] - 10) : int(label["bndbox"][2] + 10),:], ((10,10),(10,10),(0,0)),constant_values=(255))
-    cv2.imwrite(f"output/{i}/{label['id']}.png", padded_image)
+    cv2.imwrite(f"output/{label['id']}.png", padded_image)
 
 
 
 def main(input_file_path, i = 0):
 
-  if not os.path.exists(f"output/{i}"):
-    os.mkdir(f"output/{i}")
+  if not os.path.exists(f"output"):
+    os.mkdir(f"output")
   keras.backend.set_session(get_session())
 
 
@@ -244,15 +267,25 @@ def main(input_file_path, i = 0):
   
   image = np.pad(image, ((50,50),(50,50),(0,0)),constant_values=(255))
 
-  detected_states, detected_arrows, detected_labels = detection_on_image(image,i)
+  detected_states, detected_arrows, detected_labels = detection_on_image(image)
 
   detected_labels = assignLabelsToStates(detected_labels, detected_states)
   
   getLabelMeanings(detected_labels, image, i)
 
-  skeleton_image = skeletonize(invert(image))
-  skeleton_image=cv2.cvtColor(skeleton_image,cv2.COLOR_BGR2GRAY)
-  skeleton_image[skeleton_image>128] = 255
+
+  #Create binary image
+  binary = preprocessImageForRecognition(image)
+  #Convert to boolean array
+  binary = binary > 128
+  #Skeletonize image
+  skeleton_image = skeletonize(invert(binary))
+
+  #Convert back to opencv format
+  skeleton_image = skeleton_image*255
+  skeleton_image = skeleton_image.astype(np.uint8)
+
+  cv2.imwrite(f"output/preprocessed2.png", skeleton_image)
 
   for state in detected_states:
     state_center = (int((state["bndbox"][0] + state["bndbox"][2])/2), int((state["bndbox"][1] + state["bndbox"][3])/2))
@@ -261,12 +294,12 @@ def main(input_file_path, i = 0):
     cv2.putText(skeleton_image, str(state["id"]), getBoxCenter(state["bndbox"]), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
 
   
-  cv2.imwrite(f"output/{i}/input_line_chaser.png", skeleton_image)
+  cv2.imwrite(f"output/input_line_chaser.png", skeleton_image)
   
   line_chaser_output_image = Image.new(mode = "RGB", size=(image.shape[1],image.shape[0]), color="#ffffff")
 
-  if os.path.exists(f'output/{i}/transitions.txt'):
-    with open(f'output/{i}/transitions.txt', 'w') as f:
+  if os.path.exists(f'output/transitions.txt'):
+    with open(f'output/transitions.txt', 'w') as f:
       f.write("")
 
   for state in detected_states:
@@ -284,11 +317,8 @@ def main(input_file_path, i = 0):
         (arrow["bndbox"][0], arrow["bndbox"][1]), (arrow["bndbox"][2],arrow["bndbox"][3])):
         arrow["pointingAt"] = state["id"]
         arrow["pointingFrom"] = findArrowConnection(skeleton_image,arrow,detected_states, line_chaser_output_image, detected_labels)
-       
-
-     
         
-        with open(f'output/{i}/transitions.txt', 'a') as f:
+        with open(f'output/transitions.txt', 'a') as f:
           f.write(str(arrow))
           f.write('\n')
 
@@ -302,9 +332,10 @@ def main(input_file_path, i = 0):
   print("States:")
   for state in detected_states:
     print(state)
+  print("Labels:")
   for label in detected_labels:
     print(label)
-  line_chaser_output_image.save(f"output/{i}/line_chaser_output.png")
+  line_chaser_output_image.save(f"output/line_chaser_output.png")
 
     
 if __name__ == "__main__":
