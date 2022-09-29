@@ -5,6 +5,7 @@ from skimage.morphology import thin
 import matplotlib.pyplot as plt
 import xml.etree.ElementTree as ET
 from dict2xml import dict2xml
+from PIL import Image, ImageChops
 import cv2
 from os.path import exists
 import albumentations as A
@@ -95,8 +96,8 @@ def extractAnnotations(inkml_file_abs_path, size, filename):
 
     annotations =   {
         "folder": "datasets/automata",
-        "filename": filename*2,
-        "path": f"\home\\niemand\Keras-retinanet-Training-on-custom-datasets-for-Object-Detection-/dataset/images/{filename}.jpg",
+        "filename": filename,
+        "path": f"\home\\niemand\Keras-retinanet-Training-on-custom-datasets-for-Object-Detection-/dataset/images/{filename}.png",
         "size": {"width": size[0], "height": size[1], "depth": 1},
         "segmented": 0,
         "object": []
@@ -104,7 +105,7 @@ def extractAnnotations(inkml_file_abs_path, size, filename):
 
     for object in root.findall('symbols/traceGroup'):
         name = object.findall('annotation')[0].text
-        if(name != "arrow"):
+        if(name != "arrow" and name != "label"):
             bndbox = getBoundingBoxOfTraces(object, root)
             annotations["object"].append(
                 {
@@ -112,7 +113,7 @@ def extractAnnotations(inkml_file_abs_path, size, filename):
                     "bndbox": bndbox
                 }
             )
-        else:
+        elif(name != "label"):
             bndbox = getBoundingBoxOfTraces(object.find('head'),root)
             isFalselyAnnotated = False
             for traceView in object.findall('head/traceView'):
@@ -135,10 +136,10 @@ def extractAnnotations(inkml_file_abs_path, size, filename):
                 {
                     "name": arrow.find('name').text,
                     "bndbox": {
-                        "xmin": int(xml_bndbox.find('xmin').text) -60,
-                        "ymin": int(xml_bndbox.find('ymin').text) -60,
-                        "xmax": int(xml_bndbox.find('xmax').text) -60,
-                        "ymax": int(xml_bndbox.find('ymax').text) -60
+                        "xmin": int(xml_bndbox.find('xmin').text) -50,
+                        "ymin": int(xml_bndbox.find('ymin').text) -50,
+                        "xmax": int(xml_bndbox.find('xmax').text) -50,
+                        "ymax": int(xml_bndbox.find('ymax').text) -50
                     }
                 }
             )
@@ -178,47 +179,72 @@ def inkml2img(input_path, filename):
 
     annotations = extractAnnotations(input_path, (width,height), filename)
 
-    file = filename * 2
-
-    for object in annotations["object"]:
-      cv2.rectangle(image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
+    #for object in annotations["object"]:
+     #   cv2.rectangle(image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
 
     xml = dict2xml(annotations)
-    xmlfile = open(f"../datasets/automata/annotations/{file}.xml", "w+")
+    xmlfile = open(f"../datasets/automata/annotations/{filename}.xml", "w+")
     xmlfile.write(xml)
     xmlfile.close()
     
-    cv2.imwrite(f"../datasets/automata/images/{file}.png",image)
+    cv2.imwrite(f"../datasets/automata/images/{filename}.png",image)
 
     # Augment image and save result as well
-    augmented_image, augmented_annotations = createAugmentations(image, annotations, file)
+
+    for i in range(1,4):
+        augmented_image, augmented_annotations = createAugmentations(image, extractAnnotations(input_path, (width,height), filename), filename+300*i, i)
+        
+        xml = dict2xml(augmented_annotations)
+        xmlfile = open(f"../datasets/automata/annotations/{(filename+300*i)}.xml", "w+")
+        xmlfile.write(xml)
+        xmlfile.close()
+
+        #for object in augmented_annotations["object"]:
+         #   cv2.rectangle(augmented_image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
+
+        cv2.imwrite(f"../datasets/automata/images/{(filename + 300*i)}.png",augmented_image)
+
+def squarify(M,val):
+    (a,b,c)=M.shape
     
-    xml = dict2xml(augmented_annotations)
-    xmlfile = open(f"../datasets/automata/annotations/{(file + 1)}.xml", "w+")
-    xmlfile.write(xml)
-    xmlfile.close()
+    if a>b:
+        padding=((0,0),(0,a-b),(0,0))
+    else:
+        padding=((0,b-a),(0,0),(0,0))
+    return np.pad(M,padding,mode='constant',constant_values=val)
 
-    for object in augmented_annotations["object"]:
-      cv2.rectangle(augmented_image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
+def trim(img):
+    mask = img!=255
+    mask = mask.any(2)
+    mask0,mask1 = mask.any(0),mask.any(1)
+    colstart, colend = mask0.argmax(), len(mask0)-mask0[::-1].argmax()+1
+    rowstart, rowend = mask1.argmax(), len(mask1)-mask1[::-1].argmax()+1
+    return img[rowstart:rowend, colstart:colend]
 
-    
-
-
-    cv2.imwrite(f"../datasets/automata/images/{(file + 1)}.png",augmented_image)
-
-    
 #Creates augmentations of image
-def createAugmentations(image, annotations, filename):
+def createAugmentations(image, annotations, filename, iteration):
 
-    transform1 = A.Compose([
-        A.Flip(always_apply=True),
-        A.RandomScale(always_apply=True, scale_limit=(-0.5,-0.1))
-    ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))
+    padding=((0,20),(0,20),(0,0))
+    image = np.pad(image,padding,mode='constant',constant_values=255)
 
-    transform2 = A.Compose([
-        A.Rotate(always_apply=True),
-        A.RandomScale(always_apply=True, scale_limit=(-0.5,-0.1))
-    ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))
+    if(iteration == 1):
+        transform1 = A.Compose([
+            A.HorizontalFlip(p=1),
+            A.VerticalFlip(p=1),
+            A.RandomScale(always_apply=True, scale_limit=(-0.5,-0.1)),
+        ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))
+
+    if(iteration == 2):
+        transform1 = A.Compose([
+            A.VerticalFlip(p=1),
+            A.RandomScale(always_apply=True, scale_limit=(-0.5,-0.1)),
+        ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))
+
+    if(iteration == 3):
+        transform1 = A.Compose([
+            A.HorizontalFlip(p=1),
+            A.RandomScale(always_apply=True, scale_limit=(-0.5,-0.1)),
+        ], bbox_params=A.BboxParams(format='pascal_voc', label_fields=['class_labels']))
 
     bndbox_labels = []
     bndboxes = []
@@ -239,7 +265,10 @@ def createAugmentations(image, annotations, filename):
 
     transformed_annotations = annotations.copy()
 
-    transformed_annotations["filename"] = filename+1
+    transformed_annotations["filename"] = filename
+    transformed_annotations["path"] = f"\home\\niemand\Keras-retinanet-Training-on-custom-datasets-for-Object-Detection-/dataset/images/{filename}.png",
+
+    transformed_annotations["size"] = {"width": transformed_image.shape[0], "height": transformed_image.shape[1], "depth": 1}
     i = 0
     for bndbox in transformed_bboxes:
         transformed_annotations["object"][i]["bndbox"] = {
