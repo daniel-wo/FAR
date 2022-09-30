@@ -29,9 +29,9 @@ label_confidence_treshold = 0.4
 arrow_confidence_treshold = 0.4
 state_association_radius = 75
 delete_radius = 5
-arrow_end_to_state_radius = 50
+arrow_end_to_state_radius = 75
 arrow_line_chaser_box_radius = 10
-arrow_min_length = 50
+arrow_min_length = 100
 
 def preprocessImageForRecognition(image):
 
@@ -57,24 +57,22 @@ def detection_on_image(image):
 
   preprocessImageForRecognition(image)
 
-  model_path = 'models/augment13epoch.h5'
+  model_path = 'models/heavy.h5'
   model = models.load_model(model_path, backbone_name='resnet50')
 
 
   draw = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
   
-  print(image.shape)
   image = preprocessImageForRecognition(image)
   cv2.imwrite(f"output/test1.png", image)
 
   image = np.stack((image,image,image), axis=2)
   cv2.imwrite(f"output/test2.png", image)
 
-  print(image.shape)
   image = preprocess_image(image)
   image, scale = resize_image(image)
   
-  labels_to_names = {3: "arrow", 0: "label", 1: "state", 2: "final state"}
+  labels_to_names = {0: "arrow", 2: "final state", 1: "state"}
   cv2.imwrite(f"output/input_for_classifier.png", image)
   boxes, scores, labels = model.predict_on_batch(np.expand_dims(image, axis=0))
   boxes /= scale
@@ -84,13 +82,12 @@ def detection_on_image(image):
       if score < 0.4:
           break
 
-      if((label == 0) and score < label_confidence_treshold):
+      if((label == 0) and score < arrow_confidence_treshold):
         continue
 
-      if((label == 3) and score < arrow_confidence_treshold):
-        continue
+       
 
-      if((label == 1 or label == 2) and score < state_confidence_treshold):
+      if((label == 2 or label == 1) and score < state_confidence_treshold):
         continue
         
       color = label_color(label)
@@ -110,7 +107,6 @@ def detection_on_image(image):
   for i in range(len(boxes[0])):
     if(scores[0][i] >= 0.4):
       if labels_to_names[labels[0][i]] == "state" and scores[0][i] >= state_confidence_treshold:
-        
         for j in range(len(boxes[0])):
             if(labels[0][j] == 2 
               and do_overlap((boxes[0][i][0],boxes[0][i][1]),(boxes[0][i][2],boxes[0][i][3]), (boxes[0][j][0],boxes[0][j][1]),(boxes[0][j][2],boxes[0][j][3]))
@@ -323,6 +319,7 @@ def main(input_file_path, i = 0):
           f.write('\n')
 
   for label in detected_labels:
+    print(detected_labels)
     if not label["isStateLabel"]:
       detected_arrows[label["closestTransition"]]["label"] = label["id"]
 
