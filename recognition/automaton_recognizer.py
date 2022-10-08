@@ -36,7 +36,7 @@ delete_radius = 5
 arrowshaft_end_to_state_association_radius = 30
 arrowhead_line_chaser_starting_box_radius = 10
 arrow_min_length = 20
-label_min_size = 10
+label_min_size = 20
 label_max_size = 500
 
 def preprocessImageForRecognition(image):
@@ -48,7 +48,7 @@ def preprocessImageForRecognition(image):
   binary = cv2.adaptiveThreshold(gray, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
             cv2.THRESH_BINARY,15,11)
 
-  cv2.imwrite(f"output/preprocessed.png", binary)
+  cv2.imwrite(f"output/preprocessed_image.png", binary)
 
   return binary
 
@@ -100,7 +100,7 @@ def element_detection_on_image(image):
       draw_caption(draw, b, caption)
 
   detected_img =cv2.cvtColor(draw, cv2.COLOR_RGB2BGR)
-  cv2.imwrite(f'output/classification.png', detected_img)
+  cv2.imwrite(f'output/classified_image.png', detected_img)
 
 
   detected_states = []
@@ -373,7 +373,7 @@ def main(input_file_path, i = 0):
   skeleton_image = skeleton_image.astype(np.uint8)
 
   #Save skeletonized image
-  cv2.imwrite(f"output/preprocessed2.png", skeleton_image)
+  cv2.imwrite(f"output/skeletonized_image.png", skeleton_image)
 
   #Delete states to allow line chaser to terminate
   for state in detected_states:
@@ -384,7 +384,7 @@ def main(input_file_path, i = 0):
   skeleton_image_original = skeleton_image.copy()
 
   #Save line chaser input
-  cv2.imwrite(f"output/input_line_chaser.png", skeleton_image)
+  cv2.imwrite(f"output/input_for_line_chaser.png", skeleton_image)
   
   #Create empty image to visualize line chaser pathing
   line_chaser_output_image = Image.new(mode = "RGB", size=(image.shape[1],image.shape[0]), color="#ffffff")
@@ -414,7 +414,7 @@ def main(input_file_path, i = 0):
        
        
   #Save the line chaser output for visualization of pathing
-  line_chaser_output_image.save(f"output/line_chaser_output.png")
+  line_chaser_output_image.save(f"output/line_chaser_pathing.png")
 
 
   #Delete states and arrows from image (after line chaser deleted arrow shafts) to find labels
@@ -423,11 +423,10 @@ def main(input_file_path, i = 0):
   for arrow in detected_arrows:
     skeleton_image[int(arrow["bndbox"][1]): int(arrow["bndbox"][3]),int(arrow["bndbox"][0]): int(arrow["bndbox"][2])] = 0
 
-  Image.fromarray(skeleton_image).save(f"output/after_deletions.png")
+  Image.fromarray(skeleton_image).save(f"output/image_after_deletions_for_label_recog.png")
   
   detected_labels = findLabels(skeleton_image, detected_states)
   
-  cv2.imwrite("before.png", skeleton_image_original)
 
   line_chaser_output_image = Image.new(mode = "RGB", size=(image.shape[1],image.shape[0]), color="#ffffff")
   for state in detected_states:
@@ -450,7 +449,6 @@ def main(input_file_path, i = 0):
         with open(f'output/transitions.txt', 'a') as f:
           f.write(str(arrow))
           f.write('\n')
-  line_chaser_output_image.save("output2.png")
   assignLabels(detected_states,detected_arrows,detected_labels)
   
   
