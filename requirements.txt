@@ -6,8 +6,6 @@ scikit-learn
 imageio
 matplotlib
 opencv-python
-torchvision
-torch
 cairocffi
 dict2xml
 cython
@@ -19,3 +17,5 @@ numpy>=1.14
 pillow
 progressbar2
 tensorflow-cpu >=2.3.0
+einops
+PyWavelets
