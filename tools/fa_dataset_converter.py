@@ -3,6 +3,7 @@ import csv
 from email.mime import base
 from inspect import trace
 import random
+import os
 import numpy as np
 from skimage.draw import line
 from skimage.morphology import thin
@@ -13,6 +14,7 @@ from PIL import Image, ImageChops
 import cv2
 from os.path import exists
 import albumentations as A
+import xmltodict
 
 #Returns traces as lists of coordinates for drawing purposes and calculates an image size for the drawing
 def get_traces_data(inkml_file_abs_path):
@@ -131,6 +133,7 @@ def extractAnnotations(inkml_file_abs_path, size, filename):
                     "bndbox": bndbox
                 }
             )
+        '''
         elif(name == "label"):
             bndbox = getBoundingBoxOfTraces(object, root)
             meaning =  object.findall('annotation')[1].text
@@ -140,7 +143,7 @@ def extractAnnotations(inkml_file_abs_path, size, filename):
                     "bndbox": bndbox
                 }
             )
-
+        '''
     if(exists(f'../additional_annotations/{filename}.xml')):
         add_tree = ET.parse(f'../additional_annotations/{filename}.xml')
         add_root = add_tree.getroot()
@@ -194,7 +197,7 @@ def inkml2img(input_path, filename):
     annotations = extractAnnotations(input_path, (width,height), filename)
 
     #for object in annotations["object"]:
-     #   cv2.rectangle(image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
+     #  cv2.rectangle(image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
 
     xml = dict2xml(annotations)
     xmlfile = open(f"../datasets/automata/annotations/{filename}.xml", "w+")
@@ -214,7 +217,7 @@ def inkml2img(input_path, filename):
         xmlfile.close()
 
         #for object in augmented_annotations["object"]:
-         #   cv2.rectangle(augmented_image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
+           #cv2.rectangle(augmented_image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
 
         cv2.imwrite(f"../datasets/automata/images/{(filename + 300*i)}.png",augmented_image)
 
@@ -222,14 +225,13 @@ def squarify(M,val):
     (a,b,c)=M.shape
     
     if a>b:
-        padding=((0,0),(0,a-b),(0,0))
+        padding=((0,0),((a-b)/2,(a-b)/2),(0,0))
     else:
-        padding=((0,b-a),(0,0),(0,0))
+        padding=(((b-a)/2,(b-a)/2),(0,0),(0,0))
     return np.pad(M,padding,mode='constant',constant_values=val)
 
 def trim(img):
     mask = img!=255
-    mask = mask.any(2)
     mask0,mask1 = mask.any(0),mask.any(1)
     colstart, colend = mask0.argmax(), len(mask0)-mask0[::-1].argmax()+1
     rowstart, rowend = mask1.argmax(), len(mask1)-mask1[::-1].argmax()+1
@@ -299,16 +301,25 @@ def createTextDetectionDataset(number_of_samples):
     for i in range(0,number_of_samples):
 
         # Get random automaton picture and corresponding annotations
-        base_image_number = random.randint(0,299)
+        base_image_number = i
+        print(i)
         base_image = Image.open(f"../datasets/automata/images/{base_image_number}.png")
         np_base_image = np.pad(np.array(base_image), ((50,50),(50,50)),mode="constant", constant_values="255")
-        base_annotations = extractAnnotations(f"../FA_database_1.1/{base_image_number}.inkml", (np_base_image.shape[1]+100,np_base_image.shape[0]+100), base_image_number)
+        #base_annotations = extractAnnotations(f"../FA_database_1.1/{base_image_number}.inkml", (np_base_image.shape[1]+100,np_base_image.shape[0]+100), base_image_number)
+        with open(f'../datasets/automata/annotations/{i}.xml', 'r') as file:
+            data = file.read()
+            data = f"<root>{data}</root>"
+            base_annotations = xmltodict.parse(data)
+            base_annotations = base_annotations["root"]
+            file.close()
 
-        with open('../datasets/characters/english.csv', mode='r') as infile:
+        with open('../datasets/emnist/emnist-balanced-mapping.csv', mode='r') as infile:
             reader = csv.reader(infile)
             char_dict = {rows[0]:rows[1] for rows in reader}
+            infile.close()
         # Replace old labels with random letters from the character dataset
 
+        '''
         indices_to_delete = []
         for j in range(0,len(base_annotations["object"])):
             if base_annotations["object"][j]["name"]  != "label":
@@ -317,55 +328,61 @@ def createTextDetectionDataset(number_of_samples):
         indices_to_delete.reverse()
         for j in indices_to_delete:
             base_annotations["object"].pop(j)
-
+        '''
         for object in base_annotations["object"]:
-            if object["name"] == "label":
-                old_label_bndbox = {
-                    "xmin": object["bndbox"]["xmin"] + 50,
-                    "ymin": object["bndbox"]["ymin"] + 50,
-                    "xmax": object["bndbox"]["xmax"] + 50,
-                    "ymax": object["bndbox"]["ymax"] + 50,
+            old_label_bndbox = {
+                    "xmin": int(object["bndbox"]["xmin"]) + 50,
+                    "ymin": int(object["bndbox"]["ymin"]) + 50,
+                    "xmax": int(object["bndbox"]["xmax"]) + 50,
+                    "ymax": int(object["bndbox"]["ymax"]) + 50,
                 }
+                
+            if object["name"] == "label":
                 
                 # Delete old label by coloring it white
                 np_base_image[old_label_bndbox["ymin"]:old_label_bndbox["ymax"], old_label_bndbox["xmin"]:old_label_bndbox["xmax"]] = 255
                 np_base_image[old_label_bndbox["ymin"]-3:old_label_bndbox["ymax"]+3, old_label_bndbox["xmin"]-3:old_label_bndbox["xmax"]+3] = 255
                 # Insert new letter and correct bndbox
-                random_char = random.randint(1,62)
-                random_char_variant = random.randint(1,55)
-                char_image_name = f"Img/img{str(random_char).zfill(3)}-{str(random_char_variant).zfill(3)}.png"
-                char_image_size = trim(np.array(Image.open(f"../datasets/characters/{char_image_name}"))).shape
+                random_char = random.randint(0,46)
+                char_image_name = random.choice(os.listdir(f"../datasets/emnist/training/{random_char}"))
+                char_image_size = np.array(Image.open(f"../datasets/emnist/training/{random_char}/{char_image_name}")).shape
 
-                letter_image = Image.fromarray(trim(np.array(Image.open(f"../datasets/characters/{char_image_name}")))).resize((
-                    int(char_image_size[1] * 0.12), int(char_image_size[0] * 0.12)
+                scale_factor = random.randint(15, 22)*0.1
+                letter_image = Image.fromarray(trim(255 - np.rot90(np.fliplr(np.array(Image.open(f"../datasets/emnist/training/{random_char}/{char_image_name}")))))).resize((
+                    int(char_image_size[1]*scale_factor), int(char_image_size[0]*scale_factor)
                 ))
                 automaton_image = Image.fromarray(np_base_image)
                 automaton_image.paste(letter_image,
-                    (int(old_label_bndbox["xmin"] + (old_label_bndbox["xmax"] - old_label_bndbox["xmin"])/2 - char_image_size[1]*0.05), 
-                    int(old_label_bndbox["ymin"] + (old_label_bndbox["ymax"] - old_label_bndbox["ymin"])/2 - char_image_size[0]*0.05))
+                    (int(old_label_bndbox["xmin"] + (old_label_bndbox["xmax"] - old_label_bndbox["xmin"])/2 - char_image_size[1]*0.5), 
+                    int(old_label_bndbox["ymin"] + (old_label_bndbox["ymax"] - old_label_bndbox["ymin"])/2 - char_image_size[0]*0.5))
                 )
 
                 object["bndbox"] = {
-                    "xmin": int(old_label_bndbox["xmin"] + (old_label_bndbox["xmax"] - old_label_bndbox["xmin"])/2 - char_image_size[1]*0.05), 
-                    "ymin": int(old_label_bndbox["ymin"] + (old_label_bndbox["ymax"] - old_label_bndbox["ymin"])/2 - char_image_size[0]*0.05),
-                    "xmax": int(old_label_bndbox["xmin"] + (old_label_bndbox["xmax"] - old_label_bndbox["xmin"])/2 - char_image_size[1]*0.05 + char_image_size[1]*0.12),
-                    "ymax": int(old_label_bndbox["ymin"] + (old_label_bndbox["ymax"] - old_label_bndbox["ymin"])/2 - char_image_size[0]*0.05 + char_image_size[0]*0.12) 
+                    "xmin": int(old_label_bndbox["xmin"] + (old_label_bndbox["xmax"] - old_label_bndbox["xmin"])/2 - char_image_size[1]*0.5), 
+                    "ymin": int(old_label_bndbox["ymin"] + (old_label_bndbox["ymax"] - old_label_bndbox["ymin"])/2 - char_image_size[0]*0.5),
+                    "xmax": int(old_label_bndbox["xmin"] + (old_label_bndbox["xmax"] - old_label_bndbox["xmin"])/2 - char_image_size[1]*0.5 + char_image_size[1]*scale_factor),
+                    "ymax": int(old_label_bndbox["ymin"] + (old_label_bndbox["ymax"] - old_label_bndbox["ymin"])/2 - char_image_size[0]*0.5 + char_image_size[0]*scale_factor) 
                 }
-                object["name"] = char_dict[char_image_name]
+                object["name"] = "label"
                 np_base_image = np.array(automaton_image)
-
+            else:
+                object["bndbox"] = {
+                    "xmin": int(object["bndbox"]["xmin"]) + 50,
+                    "ymin": int(object["bndbox"]["ymin"]) + 50,
+                    "xmax": int(object["bndbox"]["xmax"]) + 50,
+                    "ymax": int(object["bndbox"]["ymax"]) + 50,
+                }
         xml = dict2xml(base_annotations)
         xmlfile = open(f"../datasets/text_detection_automata/annotations/{i}.xml", "w+")
         xmlfile.write(xml)
         xmlfile.close()
         automaton_image = np.array(automaton_image)
-        for object in base_annotations["object"]:
-            cv2.rectangle(automaton_image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
+        #for object in base_annotations["object"]:
+        #   cv2.rectangle(automaton_image, (object["bndbox"]["xmin"],object["bndbox"]["ymin"]), (object["bndbox"]["xmax"],object["bndbox"]["ymax"]), (0,255,0), 2)
 
         cv2.imwrite(f"../datasets/text_detection_automata/images/{i}.png", automaton_image)
 for i in range(0,300):
     inkml2img(f"../FA_database_1.1/{i}.inkml", i)
 
-createTextDetectionDataset(500)
 
 
