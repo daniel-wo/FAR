@@ -50,6 +50,7 @@ def chase_line(image, starting_position, initial_direction, output_image, detect
         continue
       label_center = getBoxCenter(label["bndbox"])
       distance_to_label = np.linalg.norm((x-label_center[0],y-label_center[1]))
+
       if label["closestTransitionDistance"] > distance_to_label:
         label["closestTransitionDistance"] = distance_to_label
         label["closestTransition"] = arrow_id
@@ -128,7 +129,7 @@ def chase_line(image, starting_position, initial_direction, output_image, detect
       current_position = (x-1,y-1)
       image_matrix[x: x+3 ,y: y+3] = 0
 
-    draw.point(current_position, "#ff0000")
+    draw.point(current_position, "#" + f"{'F'*(arrow_id%6)}".zfill(6))
     steps +=1
   return current_position, steps
 
