@@ -29,12 +29,12 @@ import line_chaser
 
 
 # Parameters for classification and recognition purposes
-state_confidence_treshold = 0.7
+state_confidence_treshold = 0.75
 arrow_confidence_treshold = 0.4
 arrowhead_to_state_association_radius = 30
 delete_radius = 5
 arrowshaft_end_to_state_association_radius = 30
-arrowhead_line_chaser_starting_box_radius = 10
+arrowhead_line_chaser_starting_box_radius = 0
 arrow_min_length = 20
 label_min_size = 20
 label_max_size = 500
@@ -452,7 +452,7 @@ def main(input_file_path, i = 0):
   assignLabels(detected_states,detected_arrows,detected_labels)
   
   
-  
+
   #Print results to console
   print("Transitions:")
   for arrow in detected_arrows:
@@ -463,7 +463,9 @@ def main(input_file_path, i = 0):
   print("Labels:")
   for label in detected_labels:
     print(label)
-
+    cv2.putText(skeleton_image_original, str(label["id"]), getBoxCenter(label["bndbox"]), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
+    cv2.rectangle(skeleton_image_original, (int(label["bndbox"][0]), int(label["bndbox"][1])),(int(label["bndbox"][2]), int(label["bndbox"][3])),(255, 0, 0))
+  cv2.imwrite("output/labelIds.png", skeleton_image_original)
     
 if __name__ == "__main__":
   input_file_path = sys.argv[1]
