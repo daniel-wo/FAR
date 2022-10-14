@@ -351,6 +351,8 @@ def main(input_file_path, i = 0):
 
   if not os.path.exists(f"output"):
     os.mkdir(f"output")
+  if not os.path.exists(f"output/labels"):
+    os.mkdir(f"output/labels")
   keras.backend.set_session(get_session())
 
 

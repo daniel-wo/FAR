@@ -1,3 +1,4 @@
 datasets/**
 FA_database_1.1/**
 recognition/output/**
+**/__pycache__
