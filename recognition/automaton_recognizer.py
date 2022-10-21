@@ -29,11 +29,11 @@ import line_chaser
 
 
 # Parameters for classification and recognition purposes
-state_confidence_treshold = 0.75
-arrow_confidence_treshold = 0.4
-arrowhead_to_state_association_radius = 30
+state_confidence_treshold = 0.9
+arrow_confidence_treshold = 0.6
+arrowhead_to_state_association_radius = 40
 delete_radius = 5
-arrowshaft_end_to_state_association_radius = 30
+arrowshaft_end_to_state_association_radius = 40
 arrowhead_line_chaser_starting_box_radius = 0
 arrow_min_length = 20
 label_min_size = 20
@@ -43,9 +43,9 @@ def preprocessImageForRecognition(image):
 
   gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-  #spgauss = cv2.GaussianBlur(gray,(3,3),cv2.BORDER_DEFAULT)
+  gauss = cv2.GaussianBlur(gray,(3,3),cv2.BORDER_DEFAULT)
 
-  binary = cv2.adaptiveThreshold(gray, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
+  binary = cv2.adaptiveThreshold(gauss, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
             cv2.THRESH_BINARY,15,11)
 
   cv2.imwrite(f"output/preprocessed_image.png", binary)
@@ -176,11 +176,12 @@ def getBoxCenter(bndbox):
   return (int((bndbox[0] + bndbox[2]) / 2), int((bndbox[1] + bndbox[3]) /2))
 
 def assignLabels(detected_states, detected_arrows, detected_labels):
+  '''
   for state in detected_states:
     for label in detected_labels:
       if do_overlap((state["bndbox"][0],state["bndbox"][1]),(state["bndbox"][2],state["bndbox"][3]),(label["bndbox"][0],label["bndbox"][1]),(label["bndbox"][2],label["bndbox"][3])) and label["isStateLabel"]:
         state["label"] = label["meaning"]
-
+  '''
   for arrow in detected_arrows:
     for label in detected_labels:
       if not label["isStateLabel"] and arrow["id"] == label["closestTransition"]:
@@ -229,9 +230,10 @@ def findArrowConnection(image, arrow, detected_states, output_image, detected_la
         "maxX": state["bndbox"][2] + arrowshaft_end_to_state_association_radius,
         "maxY": state["bndbox"][3] + arrowshaft_end_to_state_association_radius
       }
-      chase_line(image, maximum_length_line[0], direction, output_image, detected_labels, arrow["id"])
+      
 
       if(search_box["minX"] < maximum_length_line[1][0][0] < search_box["maxX"] and search_box["minY"] < maximum_length_line[1][0][1] < search_box["maxY"]):
+        chase_line(image, maximum_length_line[0], direction, output_image, detected_labels, arrow["id"])
         return state["id"]
       
   return "start"
@@ -287,6 +289,7 @@ def findLabels(image, detected_states):
       "closestTransitionDistance": math.inf
     })
   
+  '''
   offset = len(detected_labels)
   for i, state in enumerate(detected_states):
     id = offset + i
@@ -334,6 +337,7 @@ def findLabels(image, detected_states):
       "bndbox": state["bndbox"],
       "isStateLabel": True,
     })  
+    '''
   return detected_labels
 
 
@@ -423,13 +427,13 @@ def main(input_file_path, i = 0):
   for state in detected_states:
     skeleton_image[int(state["bndbox"][1]): int(state["bndbox"][3]),int(state["bndbox"][0]): int(state["bndbox"][2])] = 0
   for arrow in detected_arrows:
-    skeleton_image[int(arrow["bndbox"][1]): int(arrow["bndbox"][3]),int(arrow["bndbox"][0]): int(arrow["bndbox"][2])] = 0
+    if arrow["pointingFrom"] != None and arrow["pointingAt"] != None:
+      skeleton_image[int(arrow["bndbox"][1]): int(arrow["bndbox"][3]),int(arrow["bndbox"][0]): int(arrow["bndbox"][2])] = 0
 
   Image.fromarray(skeleton_image).save(f"output/image_after_deletions_for_label_recog.png")
   
   detected_labels = findLabels(skeleton_image, detected_states)
   
-
   line_chaser_output_image = Image.new(mode = "RGB", size=(image.shape[1],image.shape[0]), color="#ffffff")
   for state in detected_states:
     #Find arrowheads that are close to states by defining a search box
@@ -443,7 +447,7 @@ def main(input_file_path, i = 0):
     for arrow in detected_arrows:
       #Check for each arrow if it overlaps with the search box and if so set the pointingAt and start the line chaser to find the pointingFrom
       if do_overlap((search_box["minX"], search_box["minY"]),(search_box["maxX"], search_box["maxY"]),
-        (arrow["bndbox"][0], arrow["bndbox"][1]), (arrow["bndbox"][2],arrow["bndbox"][3])):
+        (arrow["bndbox"][0], arrow["bndbox"][1]), (arrow["bndbox"][2],arrow["bndbox"][3])) and arrow["pointingFrom"] != None and arrow["pointingAt"] != None:
         findArrowConnection(skeleton_image_original,arrow,detected_states, line_chaser_output_image, detected_labels)
 
        
