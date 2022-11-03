@@ -92,7 +92,6 @@ def element_detection_on_image(image):
 
   for box, score, label in zip(boxes, scores, labels):
 
-      print(box,score,label)
       if score < min(arrow_confidence_treshold,state_confidence_treshold):
         break
     
@@ -226,7 +225,7 @@ def findArrowConnection(image, arrow, detected_states, output_image, detected_la
   for i in range(int(arrow["bndbox"][0]-arrowhead_line_chaser_starting_box_radius), int(arrow["bndbox"][2]+arrowhead_line_chaser_starting_box_radius)):
     for j in range(int(arrow["bndbox"][1]-arrowhead_line_chaser_starting_box_radius),int(arrow["bndbox"][3]+arrowhead_line_chaser_starting_box_radius)):
       if image[j,i] != 0:
-        line_chaser_results.append(((i,j),chase_line(image.copy(), (i,j), direction, output_image, detected_labels, arrow["id"])))
+        line_chaser_results.append(((i,j),chase_line(image, (i,j), direction, output_image, detected_labels, arrow["id"])))
     
   line_chaser_results = list(filter(lambda r: r[1][1] > arrow_min_length, line_chaser_results))
 
@@ -244,8 +243,8 @@ def findArrowConnection(image, arrow, detected_states, output_image, detected_la
       if(search_box["minX"] < maximum_length_line[1][0][0] < search_box["maxX"] and search_box["minY"] < maximum_length_line[1][0][1] < search_box["maxY"]):
         chase_line(image, maximum_length_line[0], direction, output_image, detected_labels, arrow["id"])
         return state["id"]
-      
-  return "start"
+
+  
 
 def findLabels(image, detected_states):
 
