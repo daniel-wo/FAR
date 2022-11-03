@@ -21,6 +21,7 @@ import math
 import tensorflow as tf
 import torch
 from torchvision import transforms
+from torchvision.ops import nms
 
 
 from tensorflow.python.keras.backend import get_session
@@ -81,9 +82,17 @@ def element_detection_on_image(image):
   cv2.imwrite(f"output/input_for_classifier.png", image)
   boxes, scores, labels = model.predict_on_batch(np.expand_dims(image, axis=0))
   boxes /= scale
+  
+  selected_indices = tf.image.non_max_suppression(
+      boxes[0], scores[0], len(boxes[0]),iou_threshold = 0.4)
 
-  for box, score, label in zip(boxes[0], scores[0], labels[0]):
+  boxes = boxes[0][selected_indices]
+  scores = scores[0][selected_indices]
+  labels = labels[0][selected_indices]
 
+  for box, score, label in zip(boxes, scores, labels):
+
+      print(box,score,label)
       if score < min(arrow_confidence_treshold,state_confidence_treshold):
         break
     
@@ -106,37 +115,37 @@ def element_detection_on_image(image):
   detected_states = []
   detected_arrows = []
 
-  for i in range(len(boxes[0])):
-    if(scores[0][i] >= 0.4):
-      if labels_to_names[labels[0][i]] == "state" and scores[0][i] >= state_confidence_treshold:
+  for i in range(len(boxes)):
+    if(scores[i] >= 0.4):
+      if labels_to_names[labels[i]] == "state" and scores[i] >= state_confidence_treshold:
         # Do not append this state if the state was already recognized as final state
-        for j in range(len(boxes[0])):
-            if(labels[0][j] != -1
-              and labels_to_names[labels[0][j]] == "final_state"
-              and do_overlap((boxes[0][i][0],boxes[0][i][1]),(boxes[0][i][2],boxes[0][i][3]), (boxes[0][j][0],boxes[0][j][1]),(boxes[0][j][2],boxes[0][j][3]))
-              and scores[0][j] >= state_confidence_treshold):
+        for j in range(len(boxes)):
+            if(labels[j] != -1
+              and labels_to_names[labels[j]] == "final_state"
+              and do_overlap((boxes[i][0],boxes[i][1]),(boxes[i][2],boxes[i][3]), (boxes[j][0],boxes[j][1]),(boxes[j][2],boxes[j][3]))
+              and scores[j] >= state_confidence_treshold):
               continue
         else:
           detected_states.append({
             "id": len(detected_states),
-            "bndbox": boxes[0][i],
+            "bndbox": boxes[i],
             "final": False,
-            "score": scores[0][i],
+            "score": scores[i],
             "label": None
           })
-      elif labels_to_names[labels[0][i]] == "final state" and scores[0][i] >= state_confidence_treshold:
+      elif labels_to_names[labels[i]] == "final state" and scores[i] >= state_confidence_treshold:
         detected_states.append({
           "id": len(detected_states),
-          "bndbox": boxes[0][i],
+          "bndbox": boxes[i],
           "final": True,
-          "score": scores[0][i],
+          "score": scores[i],
           "label": None
         })
-      elif labels_to_names[labels[0][i]] == "arrow" and scores[0][i] >= arrow_confidence_treshold:
+      elif labels_to_names[labels[i]] == "arrow" and scores[i] >= arrow_confidence_treshold:
         detected_arrows.append({
           "id": len(detected_arrows),
-          "bndbox": boxes[0][i],
-          "score": scores[0][i],
+          "bndbox": boxes[i],
+          "score": scores[i],
           "pointingFrom": None,
           "pointingAt": None,
           "label": []
@@ -253,7 +262,7 @@ def findLabels(image, detected_states):
     image = cv2.imread(input_file_path)
     image = np.pad(image, ((50,50),(50,50),(0,0)),constant_values=(255))
 
-    gray = cv2.cvtColor(invert(image), cv2.COLOR_BGR2GRAY)
+    gray = invert(preprocessImageForRecognition(image))
 
     #Extract label excerpt
     label_image = Image.fromarray(squarify(gray[bbox[1]: bbox[1] + bbox[3], bbox[0]: bbox[0] + bbox[2]],0))
