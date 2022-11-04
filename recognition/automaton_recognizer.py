@@ -30,7 +30,7 @@ import line_chaser
 
 
 # Parameters for classification and recognition purposes
-state_confidence_treshold = 0.9
+state_confidence_treshold = 0.8
 arrow_confidence_treshold = 0.6
 arrowhead_to_state_association_radius = 40
 delete_radius = 5
@@ -84,7 +84,7 @@ def element_detection_on_image(image):
   boxes /= scale
   
   selected_indices = tf.image.non_max_suppression(
-      boxes[0], scores[0], len(boxes[0]),iou_threshold = 0.4)
+      boxes[0], scores[0], len(boxes[0]),iou_threshold = 0.5)
 
   boxes = boxes[0][selected_indices]
   scores = scores[0][selected_indices]
@@ -243,6 +243,8 @@ def findArrowConnection(image, arrow, detected_states, output_image, detected_la
       if(search_box["minX"] < maximum_length_line[1][0][0] < search_box["maxX"] and search_box["minY"] < maximum_length_line[1][0][1] < search_box["maxY"]):
         chase_line(image, maximum_length_line[0], direction, output_image, detected_labels, arrow["id"])
         return state["id"]
+
+  return "start"
 
   
 
