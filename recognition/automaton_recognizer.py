@@ -22,7 +22,7 @@ import tensorflow as tf
 import torch
 from torchvision import transforms
 from torchvision.ops import nms
-
+import json
 
 from tensorflow.python.keras.backend import get_session
 
@@ -84,7 +84,7 @@ def element_detection_on_image(image):
   boxes /= scale
   
   selected_indices = tf.image.non_max_suppression(
-      boxes[0], scores[0], len(boxes[0]),iou_threshold = 0.5)
+      boxes[0], scores[0], len(boxes[0]),iou_threshold = 0.1)
 
   boxes = boxes[0][selected_indices]
   scores = scores[0][selected_indices]
@@ -350,7 +350,83 @@ def findLabels(image, detected_states):
     '''
   return detected_labels
 
+def parseOutputToJSON(detected_states, detected_arrows):
+  output = {
+    "fsmAlphabet": "",
+    "nodes": [],
+    "links": [],
+    "textItems": []
+  }
 
+  
+  for i,state in enumerate(detected_states):
+    box_center = getBoxCenter(state["bndbox"])
+    output["nodes"].append({
+      "x": box_center[0],
+      "y": box_center[1],
+      "text": str(i),
+      "isAcceptState": state["final"],
+      "radius": 35,
+      "opacity": 1,
+      "dashesEnabled": False,
+      "borderColor": "black",
+      "bgColor": "transparent",
+      "textColor": "black",
+      "readonly.isInitialState": True
+    })
+  for i,arrow in enumerate(detected_arrows):
+    arrowLabel = ""
+    for i,character in enumerate(arrow["label"]):
+      if(i != 0): arrowLabel += ", "
+      arrowLabel += character
+ 
+
+    if arrow["pointingFrom"] != None and arrow["pointingAt"] != None:
+      if arrow["pointingFrom"] == arrow["pointingAt"]:
+        output["links"].append({
+          "type": "SelfLink",
+            "nodeIndex": arrow["pointingFrom"],   
+            "nodeHasArrow": True,
+            "text": arrowLabel,
+            "opacity": 1,
+            "dashesEnabled": False,
+            "lineColor": "black",
+            "arrowColor": "black",
+            "textColor": "black",
+            "anchorAngle": -1.941687615607559
+        })
+      elif arrow["pointingFrom"] == "start":
+        output["links"].append({
+          "type": "StartLink",
+            "nodeIndex": arrow["pointingAt"],
+            "text": "",
+            "opacity": 1,
+            "dashesEnabled": False,
+            "lineColor": "black",
+            "arrowColor": "black",
+            "textColor": "black",
+            "prefersNodeVisualAttrs": True,
+            "deltaX": -100,
+            "deltaY": -60
+        })
+      else:
+        output["links"].append({
+          "type": "Link",
+            "nodeAIndex": arrow["pointingFrom"],
+            "nodeAHasArrow": False,
+            "nodeBIndex": arrow["pointingAt"],
+            "nodeBHasArrow": True,
+            "text": arrowLabel,
+            "opacity": 1,
+            "dashesEnabled": False,
+            "lineColor": "black",
+            "arrowColor": "black",
+            "textColor": "black",
+            "lineAngleAdjust": 3.141592653589793,
+            "parallelPart": 0.38174471119562636,
+            "perpendicularPart": 0
+        })
+  return output
   
 def squarify(M,val):
     (a,b)=M.shape
@@ -482,7 +558,10 @@ def main(input_file_path, i = 0):
     cv2.putText(skeleton_image_original, str(label["id"]), getBoxCenter(label["bndbox"]), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
     cv2.rectangle(skeleton_image_original, (int(label["bndbox"][0]), int(label["bndbox"][1])),(int(label["bndbox"][2]), int(label["bndbox"][3])),(255, 0, 0))
   cv2.imwrite("output/labelIds.png", skeleton_image_original)
-    
+  
+  with open("output/output.json", "a") as outfile:
+    json.dump(parseOutputToJSON(detected_states, detected_arrows), outfile)
+  
 if __name__ == "__main__":
   input_file_path = sys.argv[1]
   main(input_file_path)
