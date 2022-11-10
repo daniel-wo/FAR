@@ -19,3 +19,4 @@ progressbar2
 tensorflow-cpu >=2.3.0
 einops
 PyWavelets
+docker

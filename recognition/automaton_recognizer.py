@@ -559,8 +559,11 @@ def main(input_file_path, i = 0):
     cv2.rectangle(skeleton_image_original, (int(label["bndbox"][0]), int(label["bndbox"][1])),(int(label["bndbox"][2]), int(label["bndbox"][3])),(255, 0, 0))
   cv2.imwrite("output/labelIds.png", skeleton_image_original)
   
-  with open("output/output.json", "a") as outfile:
+  with open("output/output.js", "w") as outfile:
+    outfile.write("var json ='")
     json.dump(parseOutputToJSON(detected_states, detected_arrows), outfile)
+    outfile.write("'")
+
   
 if __name__ == "__main__":
   input_file_path = sys.argv[1]

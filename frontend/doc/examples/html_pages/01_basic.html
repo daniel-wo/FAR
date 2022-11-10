@@ -167,9 +167,10 @@
         <script src="../../../src/nvc.js"></script>
         <script src="../../../src/nvc_fsm.js"></script>
         <script src="../../../src/nvc_quick.js"></script>
+        <script src="../../../../recognition/output/output.js"></script>
+
         <script>
             var JsuCmn = Jsu.Common;
-
             var outputIndents = 4;
             Nvc.quick.bootstrap('elt_canvas', 'elt_output', {
                 'onLoad': function() {
@@ -177,7 +178,7 @@
 
                     // allow the user to see all nodes and text items but not necessarily links
                     
-                    Nvc.quick.outputText('{"fsmAlphabet": "", "nodes": [ { "x": 1127, "y": 1111, "text": "1", "isAcceptState": false, "radius": 25, "opacity": 1, "dashesEnabled": false, "borderColor": "black", "bgColor": "transparent", "textColor": "black", "readonly.isInitialState": false }, { "x": 321, "y": 233, "text": "2", "isAcceptState": false, "radius": 25, "opacity": 1, "dashesEnabled": false, "borderColor": "black", "bgColor": "transparent", "textColor": "black", "readonly.isInitialState": false } ], "links": [ { "type": "Link", "nodeAIndex": 0, "nodeAHasArrow": false, "nodeBIndex": 1, "nodeBHasArrow": true, "text": "a", "opacity": 1, "dashesEnabled": false, "lineColor": "black", "arrowColor": "black", "textColor": "black", "lineAngleAdjust": 0, "parallelPart": 0.5, "perpendicularPart": 0 }, { "type": "SelfLink", "nodeIndex": 1, "nodeHasArrow": true, "text": "b", "opacity": 1, "dashesEnabled": false, "lineColor": "black", "arrowColor": "black", "textColor": "black", "anchorAngle": -0.7378150601204649 } ], "textItems": []}');
+                    Nvc.quick.outputText(json);
                     Nvc.quick.loadJsonFromOutput();
                     Nvc.moveNodesIntoCanvasVisibleArea();
                     Nvc.moveTextItemsIntoCanvasVisibleArea();
