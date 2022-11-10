@@ -1,6 +1,5 @@
 FROM python:3.8
 
-WORKDIR /usr/src/app
 
 RUN apt-get update
 RUN apt-get -qq -y install curl ffmpeg libsm6 libxext6 git git-lfs
@@ -17,4 +16,7 @@ RUN chown -R user:user /home/user/.ssh
 
 COPY . .
 
-CMD [ "python3", "./text-detection.py" ]
+
+WORKDIR /recognition
+ENTRYPOINT ["python3", "automaton_recognizer.py"]
+CMD []
