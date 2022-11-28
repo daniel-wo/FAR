@@ -49,7 +49,7 @@ def preprocessImageForRecognition(image):
   binary = cv2.adaptiveThreshold(gauss, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
             cv2.THRESH_BINARY,15,11)
 
-  cv2.imwrite(f"output/preprocessed_image.png", binary)
+  cv2.imwrite(f"IO/preprocessed_image.png", binary)
 
   return binary
 
@@ -79,7 +79,7 @@ def element_detection_on_image(image):
   with open('./classes.csv', mode='r') as infile:
             reader = csv.reader(infile)
             labels_to_names = {int(rows[1]):rows[0] for rows in reader}
-  cv2.imwrite(f"output/input_for_classifier.png", image)
+  cv2.imwrite(f"IO/input_for_classifier.png", image)
   boxes, scores, labels = model.predict_on_batch(np.expand_dims(image, axis=0))
   boxes /= scale
   
@@ -108,7 +108,7 @@ def element_detection_on_image(image):
       draw_caption(draw, b, caption)
 
   detected_img =cv2.cvtColor(draw, cv2.COLOR_RGB2BGR)
-  cv2.imwrite(f'output/classified_image.png', detected_img)
+  cv2.imwrite(f'IO/classified_image.png', detected_img)
 
 
   detected_states = []
@@ -270,7 +270,7 @@ def findLabels(image, detected_states):
 
     #Resize and save for visualization
     label_image = label_image.resize((28,28))
-    label_image.save(f"output/labels/{i}.png")
+    label_image.save(f"IO/labels/{i}.png")
 
     #Flip and rotate image to convert it to EMNIST format
     image = np.rot90(np.fliplr(np.array(label_image))).copy()
@@ -321,7 +321,7 @@ def findLabels(image, detected_states):
 
     #Resize and save for visualization
     label_image = label_image.resize((28,28))
-    label_image.save(f"output/labels/{id}.png")
+    label_image.save(f"IO/labels/{id}.png")
 
     #Flip and rotate image to convert it to EMNIST format
     image = np.rot90(np.fliplr(np.array(label_image))).copy()
@@ -439,10 +439,10 @@ def squarify(M,val):
 
 def main(input_file_path, i = 0):
 
-  if not os.path.exists(f"output"):
-    os.mkdir(f"output")
-  if not os.path.exists(f"output/labels"):
-    os.mkdir(f"output/labels")
+  if not os.path.exists(f"IO"):
+    os.mkdir(f"IO")
+  if not os.path.exists(f"IO/labels"):
+    os.mkdir(f"IO/labels")
   keras.backend.set_session(get_session())
 
 
@@ -465,7 +465,7 @@ def main(input_file_path, i = 0):
   skeleton_image = skeleton_image.astype(np.uint8)
 
   #Save skeletonized image
-  cv2.imwrite(f"output/skeletonized_image.png", skeleton_image)
+  cv2.imwrite(f"IO/skeletonized_image.png", skeleton_image)
 
   #Delete states to allow line chaser to terminate
   for state in detected_states:
@@ -476,14 +476,14 @@ def main(input_file_path, i = 0):
   skeleton_image_original = skeleton_image.copy()
 
   #Save line chaser input
-  cv2.imwrite(f"output/input_for_line_chaser.png", skeleton_image)
+  cv2.imwrite(f"IO/input_for_line_chaser.png", skeleton_image)
   
   #Create empty image to visualize line chaser pathing
   line_chaser_output_image = Image.new(mode = "RGB", size=(image.shape[1],image.shape[0]), color="#ffffff")
 
   #Create file to save transitions in
-  if os.path.exists(f'output/transitions.txt'):
-    with open(f'output/transitions.txt', 'w') as f:
+  if os.path.exists(f'IO/transitions.txt'):
+    with open(f'IO/transitions.txt', 'w') as f:
       f.write("")
 
   #Find arrow connections by asssociating arrow heads to states (pointingAt) and then chasing their shaft with the line chaser (pointingFrom)
@@ -506,7 +506,7 @@ def main(input_file_path, i = 0):
        
        
   #Save the line chaser output for visualization of pathing
-  line_chaser_output_image.save(f"output/line_chaser_pathing.png")
+  line_chaser_output_image.save(f"IO/line_chaser_pathing.png")
 
 
   #Delete states and arrows from image (after line chaser deleted arrow shafts) to find labels
@@ -516,7 +516,7 @@ def main(input_file_path, i = 0):
     if arrow["pointingFrom"] != None and arrow["pointingAt"] != None:
       skeleton_image[int(arrow["bndbox"][1]): int(arrow["bndbox"][3]),int(arrow["bndbox"][0]): int(arrow["bndbox"][2])] = 0
 
-  Image.fromarray(skeleton_image).save(f"output/image_after_deletions_for_label_recog.png")
+  Image.fromarray(skeleton_image).save(f"IO/image_after_deletions_for_label_recog.png")
   
   detected_labels = findLabels(skeleton_image, detected_states)
   
@@ -538,7 +538,7 @@ def main(input_file_path, i = 0):
 
        
         #Write found transitions to output file
-        with open(f'output/transitions.txt', 'a') as f:
+        with open(f'IO/transitions.txt', 'a') as f:
           f.write(str(arrow))
           f.write('\n')
   assignLabels(detected_states,detected_arrows,detected_labels)
@@ -557,9 +557,9 @@ def main(input_file_path, i = 0):
     print(label)
     cv2.putText(skeleton_image_original, str(label["id"]), getBoxCenter(label["bndbox"]), cv2.FONT_HERSHEY_SIMPLEX, 1, (255,255,255), 2, cv2.LINE_AA)
     cv2.rectangle(skeleton_image_original, (int(label["bndbox"][0]), int(label["bndbox"][1])),(int(label["bndbox"][2]), int(label["bndbox"][3])),(255, 0, 0))
-  cv2.imwrite("output/labelIds.png", skeleton_image_original)
+  cv2.imwrite("IO/labelIds.png", skeleton_image_original)
   
-  with open("output/output.js", "w") as outfile:
+  with open("IO/output.js", "w") as outfile:
     outfile.write("var json ='")
     json.dump(parseOutputToJSON(detected_states, detected_arrows), outfile)
     outfile.write("'")
