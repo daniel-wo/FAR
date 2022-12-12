@@ -38,16 +38,35 @@ arrowshaft_end_to_state_association_radius = 40
 arrowhead_line_chaser_starting_box_radius = 0
 arrow_min_length = 20
 label_min_size = 20
-label_max_size = 500
+label_max_size = 100
 
 def preprocessImageForRecognition(image):
 
-  gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+  height, width, _ = image.shape
+
+  if(height > width and height > 1000):
+    scale_factor = 1000 / height
+    new_width = width * scale_factor
+
+    scaled = cv2.resize(image, (int(new_width), 1000))
+ 
+  elif(width > height and width > 1000):
+    scale_factor = 1000 / width
+    new_height = height * scale_factor
+
+    scaled = cv2.resize(image, (1000, int(new_height)))
+  
+  else:
+    scaled = image
+
+  gray = cv2.cvtColor(scaled, cv2.COLOR_BGR2GRAY)
 
   gauss = cv2.GaussianBlur(gray,(3,3),cv2.BORDER_DEFAULT)
 
   binary = cv2.adaptiveThreshold(gauss, 255,cv2.ADAPTIVE_THRESH_GAUSSIAN_C,\
             cv2.THRESH_BINARY,15,11)
+  
 
   cv2.imwrite(f"IO/preprocessed_image.png", binary)
 
@@ -68,6 +87,22 @@ def element_detection_on_image(image):
   model = models.load_model(element_model_path, backbone_name='resnet50')
 
   draw = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+
+  height, width, _ = draw.shape
+
+  if(height > width and height > 1000):
+    scale_factor = 1000 / height
+    new_width = width * scale_factor
+
+    draw = cv2.resize(image, (int(new_width), 1000))
+ 
+  elif(width > height and width > 1000):
+    scale_factor = 1000 / width
+    new_height = height * scale_factor
+
+    draw = cv2.resize(image, (1000, int(new_height)))
+
+  
   
   image = preprocessImageForRecognition(image)
 
@@ -264,6 +299,8 @@ def findLabels(image, detected_states):
     image = np.pad(image, ((50,50),(50,50),(0,0)),constant_values=(255))
 
     gray = invert(preprocessImageForRecognition(image))
+
+    
 
     #Extract label excerpt
     label_image = Image.fromarray(squarify(gray[bbox[1]: bbox[1] + bbox[3], bbox[0]: bbox[0] + bbox[2]],0))
@@ -479,7 +516,7 @@ def main(input_file_path, i = 0):
   cv2.imwrite(f"IO/input_for_line_chaser.png", skeleton_image)
   
   #Create empty image to visualize line chaser pathing
-  line_chaser_output_image = Image.new(mode = "RGB", size=(image.shape[1],image.shape[0]), color="#ffffff")
+  line_chaser_output_image = Image.new(mode = "RGB", size=(skeleton_image_original.shape[1],skeleton_image_original.shape[0]), color="#ffffff")
 
   #Create file to save transitions in
   if os.path.exists(f'IO/transitions.txt'):
@@ -516,11 +553,20 @@ def main(input_file_path, i = 0):
     if arrow["pointingFrom"] != None and arrow["pointingAt"] != None:
       skeleton_image[int(arrow["bndbox"][1]): int(arrow["bndbox"][3]),int(arrow["bndbox"][0]): int(arrow["bndbox"][2])] = 0
 
+
+
+  height, width = skeleton_image.shape
+
+  skeleton_image = skeleton_image[50:height-50, 50: width-50]
+
+  skeleton_image = np.pad(skeleton_image, ((50,50),(50,50)),constant_values=(0))
+
   Image.fromarray(skeleton_image).save(f"IO/image_after_deletions_for_label_recog.png")
-  
+
+
   detected_labels = findLabels(skeleton_image, detected_states)
   
-  line_chaser_output_image = Image.new(mode = "RGB", size=(image.shape[1],image.shape[0]), color="#ffffff")
+  line_chaser_output_image = Image.new(mode = "RGB", size=(skeleton_image.shape[1],skeleton_image.shape[0]), color="#ffffff")
   for state in detected_states:
     #Find arrowheads that are close to states by defining a search box
     search_box = {
