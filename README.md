@@ -15,6 +15,7 @@ This is a repository for my bachelor thesis, the project aims to allow the recog
 (optional) Do a test run with one of the test images: `python3 recognize.py ../test_images/automaton1.png`
 
 5. Add your images to the IO directory (create this directory if needed): `(/FAR/recognition/IO)`
+   (sometimes depending on the OS it is necessary to add permissions on this folder, e.g. `chmod 777 IO`)
 
 6. Execute the recognition script: `python3 recognize.py IO/{your_image}.png`
 
