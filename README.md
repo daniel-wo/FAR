@@ -20,6 +20,7 @@ This is a repository for my bachelor thesis, the project aims to allow the recog
    (sometimes depending on the OS it is necessary to add permissions on this folder, e.g. `chmod 777 IO`)
 
 7. Execute the recognition script: `python3 recognize.py IO/{your_image}.png`
+   (if you have spaces in your image file name, escape them and enclose the path in ticks e.g. `IO/contains spaces image.png` -> `'IO/contains\ spaces\ image.png'`
 
 After the script is executed, your default browser should open and show the recognition result.
 If your browser does not open, navigate to the `IO` directory and open the `0_frontend.html` yourself. Default browsers on different OS make this makeshift frontend implementation difficult. Firefox may also cause problems so use Chromium based browsers as a last resort.
